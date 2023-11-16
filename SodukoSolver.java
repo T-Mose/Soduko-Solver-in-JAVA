@@ -1,18 +1,11 @@
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 public class SodukoSolver {
     // https://www.sudoku-solutions.com/index.php?section=sudoku9by9 - To auto solve
-    // any game and some hints
-    public static String gameString = "010020300002003040080000006004700030000600008070098000300004090000800104006000000";
+    public static String gameString = "010020300004005060070000008006900070000100002030048000500006040000800106008000000";
     public static Matrix matrix;
-    // Hardcoded game - string, add option to do it with the runnning, ie args[0]
 
     public static void main(String[] args) {
         matrix = new Matrix();
@@ -24,18 +17,22 @@ public class SodukoSolver {
         int i = 0;
         while (i++ < 20 && matrix.matrixToString().length() > 81) {
             checkPossible();
-            checkSingelValues(true); // Checks rows
+            checkSingelValues(0); // Checks rows
             checkPossible();
-            checkSingelValues(false); // Checks columns
-            // Do square check
+            checkSingelValues(1); // Checks columns
+            checkPossible();
+            checkSingelValues(2); // Checks 3x3
+
+            // Do pointing pair check
+            // Bruteforce
         }
-        if (i > 20) 
+        if (i > 20)
             System.out.println("The string could not be solved, heres so far: ");
-        else    
-            System.out.println("Solved, solution string: " + matrix.matrixToString());
+        else
+            System.out.println("Solved, solution string: " + matrix.matrixToString() + " it took iterations: " + i);
     }
 
-    public static void checkSingelValues(boolean row) {
+    public static void checkSingelValues(int row) { // 0-row, 1-col, 2-3x3
         Map<Integer, Integer> frequency;
         ArrayList<Integer> nums;
         for (int i = 0; i < 9; i++) {
@@ -44,12 +41,27 @@ public class SodukoSolver {
                 frequency.put(j, 0);
             }
 
-            for (int j = 0; j < 9; j++) {
-                nums = row ? new ArrayList<>(matrix.getCell(i, j).getPossibleVals())
-                        : new ArrayList<>(matrix.getCell(j, i).getPossibleVals());
-                if (nums.size() > 1) {
-                    for (Integer value : nums) {
-                        frequency.put(value, frequency.get(value) + 1);
+            if (row < 2) {
+                for (int j = 0; j < 9; j++) {
+                    nums = row == 0 ? new ArrayList<>(matrix.getCell(i, j).getPossibleVals())
+                            : new ArrayList<>(matrix.getCell(j, i).getPossibleVals());
+                    if (nums.size() > 1) {
+                        for (Integer value : nums) {
+                            frequency.put(value, frequency.get(value) + 1);
+                        }
+                    }
+                }
+            } else if (i % 3 == 0) { // 0,3,6
+                for (int j = 0; j < 9; j += 3) { // 0-2, 3-5, 6-8
+                    for (int k = i; k < i + 3; k++) {
+                        for (int l = j; l < j + 3; l++) {
+                            nums = new ArrayList<>(matrix.getCell(k, l).getPossibleVals());
+                            if (nums.size() > 1) {
+                                for (Integer value : nums) {
+                                    frequency.put(value, frequency.get(value) + 1);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -58,13 +70,26 @@ public class SodukoSolver {
                 if (entry.getValue() == 1) {
                     nums = new ArrayList<>();
                     nums.add(entry.getKey());
-                    for (int j = 0; j < 9; j++) {
-                        if (row && matrix.getCell(i, j).getPossibleVals().contains(entry.getKey())) {
-                            matrix.getCell(i, j).setPossibleVals(nums);
-                        } else if (!row && matrix.getCell(j, i).getPossibleVals().contains(entry.getKey())) {
-                            matrix.getCell(j, i).setPossibleVals(nums);
+                    if (row < 2) { // Columns and rows
+                        for (int j = 0; j < 9; j++) {
+                            if (row == 0 && matrix.getCell(i, j).getPossibleVals().contains(entry.getKey())) {
+                                matrix.getCell(i, j).setPossibleVals(nums);
+                            } else if (row == 1 && matrix.getCell(j, i).getPossibleVals().contains(entry.getKey())) {
+                                matrix.getCell(j, i).setPossibleVals(nums);
+                            }
+                        }
+                    } else if (row == 2 && i % 3 == 0) { // 3x3 - This iteration not requred for all i
+                        for (int j = 0; j < 9; j += 3) { // 0-2, 3-5, 6-8
+                            for (int k = i; k < i + 3; k++) {
+                                for (int l = j; l < j + 3; l++) {
+                                    if (matrix.getCell(k, l).getPossibleVals().contains(entry.getKey())) {
+                                        matrix.getCell(k, l).setPossibleVals(nums);
+                                    }
+                                }
+                            }
                         }
                     }
+
                 }
             }
         }
@@ -72,7 +97,8 @@ public class SodukoSolver {
 
     public static void checkPossible() {
         int len = matrix.matrixToString().length();
-        while (true) { // Since the updated matrix might lead to changes that in turn have to be updated
+        while (true) { // Since the updated matrix might lead to changes that in turn have to be
+                       // updated
             Cell cell;
             ArrayList<Integer> vals;
             for (int i = 0; i < 9; i++) {
@@ -91,7 +117,7 @@ public class SodukoSolver {
             }
             if (matrix.matrixToString().length() == len) {
                 break;
-            }   else {
+            } else {
                 len = matrix.matrixToString().length();
             }
         }
@@ -100,7 +126,7 @@ public class SodukoSolver {
 
 class Matrix {
     public Cell[][] matrix;
-    public static final boolean SIMPLE = true;
+    public static final boolean SIMPLE = false;
     public static final String ANSI_GREEN = "\u001B[32m"; // Display it in green
     public static final String ANSI_RESET = "\u001B[0m"; // Back to white
 
@@ -151,19 +177,9 @@ class Matrix {
             }
             System.out.println();
             if ((i + 1) % 3 == 0 && i + 1 != 9) {
-                System.out.println("-----------------");
+                System.out.println("-----------------"); // Formatting
             }
         }
-    }
-
-    public static int toThreeByThree(int j) {
-        if (j < 3)
-            j = 0;
-        else if (j < 6)
-            j = 3;
-        else // i < 9
-            j = 6;
-        return j;
     }
 
     public void setAdjacent() {
@@ -176,17 +192,25 @@ class Matrix {
                         matrix[i][j].addAdjacentCell(matrix[k][j]); // Column
                     if (j != k)
                         matrix[i][j].addAdjacentCell(matrix[i][k]); // Row
+                }
+            }
+        }
+        for (int squareRow = 0; squareRow < 9; squareRow += 3) {
+            for (int squareCol = 0; squareCol < 9; squareCol += 3) {
+                addCellsInSquare(squareRow, squareCol);
+            }
+        }
+    }
 
-                    // Add cells in the same 3x3 square
-                    int startRow = toThreeByThree(i);
-                    int startCol = toThreeByThree(j);
-                    for (int row = startRow; row < startRow + 3; row++) {
-                        for (int col = startCol; col < startCol + 3; col++) {
-                            if (row != i || col != j) {
-                                matrix[i][j].addAdjacentCell(matrix[row][col]);
-                            }
+    private void addCellsInSquare(int startRow, int startCol) {
+        for (int row = startRow; row < startRow + 3; row++) {
+            for (int col = startCol; col < startCol + 3; col++) {
+                for (int adjRow = startRow; adjRow < startRow + 3; adjRow++) {
+                    for (int adjCol = startCol; adjCol < startCol + 3; adjCol++) {
+                        if (row != adjRow || col != adjCol) {
+                            matrix[row][col].addAdjacentCell(matrix[adjRow][adjCol]);
                         }
-                    } // This is extreamly inefficient, but probelby works
+                    }
                 }
             }
         }
@@ -224,11 +248,11 @@ class Cell {
         return this.possibleVals;
     }
 
-    public int getX() {
+    public int getX() { // Redundant
         return xCoordinate;
     }
 
-    public int getY() {
+    public int getY() { // Redundant
         return yCoordinate;
     }
 
