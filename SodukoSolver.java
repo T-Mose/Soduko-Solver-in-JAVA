@@ -47,6 +47,44 @@ public class SodukoSolver {
             System.out.println("Solved, solution string: " + matrix.matrixToString() + " it took iterations: " + i);
     }
 
+    public static void pointedSquare() {
+        // Will try to merge this method with pointed
+        Map<String, ArrayList<Integer>> order;
+        String location;
+        Set<Integer> three;
+        Set<Integer> six;
+        for (int i = 0; i < 9; i += 3) {
+            for (int j = 0; j < 9; j += 3) {
+                order = new HashMap<>();
+                for (int k = i; k < i + 3; k++) {
+                    for (int l = j; l < j + 3; l++) {
+                        location = l + "-" + k; // Row-column , could be column-row
+                        order.put(location, matrix.getCell(k, l).getPossibleVals());
+                    }
+                } // That should populate the hashmap
+
+                // Do some chechs in each 3x3 for adjacent unique values
+                three = new LinkedHashSet<>();
+                six = new LinkedHashSet<>();
+                for (int a = 0; a < 3; a++) { // Since there are 3 columns/rows that need exploring
+                    for (int k = i; k < i + 3; k++) {
+                        for (int l = j; l < j + 3; l++) {
+                            location = "somthing new";
+                            if (true) { // Add check to see if they are on the same row
+                                three.addAll(order.get(location));
+                            } else {
+                                six.addAll(order.get(location));
+                            }
+                        }
+                    }
+                    
+                }
+
+                // Eliminate these if they exist elsewhare on these unique values row/cloumn
+            }
+        }
+    }
+
     public static void pointed(int row) {
         // This removes pointed double/tripples from a column/rows - squares perspective
         // Does not completly determin what the cell is going to be, but can remove what
@@ -186,8 +224,7 @@ public class SodukoSolver {
 
     public static void checkPossible() {
         int len = matrix.matrixToString().length();
-        while (true) { // Since the updated matrix might lead to changes that in turn have to be
-                       // updated
+        while (true) { // Since the updated matrix might lead to changes - new update needed
             Cell cell;
             ArrayList<Integer> vals;
             for (int i = 0; i < 9; i++) {
@@ -215,7 +252,7 @@ public class SodukoSolver {
 
 class Matrix {
     public Cell[][] matrix;
-    public static final boolean SIMPLE = false;
+    public static final boolean SIMPLE = false; // Display formatting
     public static final String ANSI_GREEN = "\u001B[32m"; // Display it in green
     public static final String ANSI_RESET = "\u001B[0m"; // Back to white
 
@@ -367,3 +404,11 @@ class Cell {
         return inLetters;
     }
 }
+// Brute forcing - take the incomplete map, guess one of the cells, preferebly
+// one with few possible
+// Set said value, keep track of the others. Return the new map and try to solve
+// it
+// Implement a check to se if somthings gone wrong, in that case return to the
+// other matrix, and
+// Guess the other value/s. Will be difficult if multiple values needs to be
+// guessed in a row.
