@@ -8,7 +8,7 @@ import java.util.Set;
 public class SodukoSolver {
     // https://www.sudoku-solutions.com/index.php?section=sudoku9by9 - To auto solve
     public static String gameString = "010020300004001050060000007005400060000100002080092000300005090000700106007000000";
-    public static Matrix matrix; // To implement - pointing pairs from the perspective of the square, x-wing?
+    public static Matrix matrix; // To implement - hidden pairs, x-wing?
                                  // brute force
 
     public static void main(String[] args) {
@@ -18,41 +18,62 @@ public class SodukoSolver {
     }
 
     public static void Solve() {
-        int i = 0;
-        int len = matrix.matrixToString().length();
-        while (i++ < 20 && matrix.matrixToString().length() > 81) {
+        int len;
+        int maxIterations = 20;
+        int currentIteration = 0;
+        int previousLen;
+
+        while (currentIteration++ < maxIterations) {
+            len = matrix.matrixToString().length();
+
             do {
+                previousLen = len;
+                checkPossible();
+                checkSingelValues(0); // Rows
+                checkPossible();
+                checkSingelValues(1); // Columns
+                checkPossible();
+                checkSingelValues(2); // 3x3 Squares
                 len = matrix.matrixToString().length();
-                checkPossible(); // Run the easy calculations until the no longer improve
-                checkSingelValues(0); // Checks rows
-                checkPossible();
-                checkSingelValues(1); // Checks columns
-                checkPossible();
-                checkSingelValues(2); // Checks 3x3
-            } while (len != matrix.matrixToString().length());
+            } while (len != previousLen);
+            if (len == 81) {
+                break; // Puzzle solved
+            }
+
             checkPossible();
             pointed(1); // Columns
             checkPossible();
             pointed(0); // Rows
             checkPossible();
-            // pointed pairs from the perspective of the square
-            // Instead of checking the row/column then remove from square
-            // Do the reverse since there info can be gained
-
-            // Bruteforce
+            matrix.displayMatrix();
+            pointedSquare(true); // rows
+            matrix.displayMatrix();
+            checkPossible();
+            pointedSquare(false); // Columns
+            matrix.displayMatrix();
+            if (len == matrix.matrixToString().length()) {
+                System.out.println("Could not be solved");
+                break;
+            }
+            // brute force requred if it could not be doen
         }
-        if (i > 20)
-            System.out.println("The string could not be solved, heres so far: ");
-        else
-            System.out.println("Solved, solution string: " + matrix.matrixToString() + " it took iterations: " + i);
+
+        if (matrix.matrixToString().length() == 81) {
+            System.out.println("Sudoku solved! it took this many iterations: " + currentIteration);
+            System.out.println("The complete string is: " + matrix.matrixToString());
+        } else {
+            System.out.println("Sudoku not solved in " + currentIteration + " iterations.");
+        }
     }
 
-    public static void pointedSquare() {
+    public static void pointedSquare(boolean row) {
         // Will try to merge this method with pointed
         Map<String, ArrayList<Integer>> order;
         String location;
         Set<Integer> three;
         Set<Integer> six;
+        Set<Integer> uniqueElements;
+        int rowCol;
         for (int i = 0; i < 9; i += 3) {
             for (int j = 0; j < 9; j += 3) {
                 order = new HashMap<>();
@@ -64,23 +85,63 @@ public class SodukoSolver {
                 } // That should populate the hashmap
 
                 // Do some chechs in each 3x3 for adjacent unique values
-                three = new LinkedHashSet<>();
-                six = new LinkedHashSet<>();
                 for (int a = 0; a < 3; a++) { // Since there are 3 columns/rows that need exploring
+                    three = new LinkedHashSet<>();
+                    six = new LinkedHashSet<>();
                     for (int k = i; k < i + 3; k++) {
                         for (int l = j; l < j + 3; l++) {
-                            location = "somthing new";
-                            if (true) { // Add check to see if they are on the same row
-                                three.addAll(order.get(location));
-                            } else {
-                                six.addAll(order.get(location));
+                            location = l + "-" + k;
+                            if (order.get(location).size() != 1) {
+                                if (row) {
+                                    if (k % 3 == a) { // Row
+                                        three.addAll(order.get(location));
+                                    } else {
+                                        six.addAll(order.get(location));
+                                    }
+                                } else if (!row) {
+                                    if (l % 3 == a) { // The sought after column
+                                        three.addAll(order.get(location));
+                                    } else {
+                                        six.addAll(order.get(location));
+                                    }
+                                }
                             }
                         }
                     }
-                    
+                    uniqueElements = new HashSet<>(three);
+                    uniqueElements.removeAll(six); // The ones left should be the unique elements
+                    if (row) {
+                        rowCol = i + a;
+                        for (int o = 0; o < 9; o++) {
+                            if (!(j <= o && o < j + 3)) {
+                                for (Integer integer : uniqueElements) {
+                                    if (matrix.getCell(rowCol, o).getPossibleVals().contains(integer)) {
+                                        matrix.getCell(rowCol, o).removePossibleVals(integer);
+                                        System.out
+                                                .println("ROW, We are removing: " + integer + " from cell: " + rowCol
+                                                        + "."
+                                                        + o);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (!row) {
+                        rowCol = j + a;
+                        for (int o = 0; o < 9; o++) {
+                            if (!(i <= o && o < i + 3)) {
+                                for (Integer integer : uniqueElements) {
+                                    if (matrix.getCell(o, rowCol).getPossibleVals().contains(integer)) {
+                                        matrix.getCell(o, rowCol).removePossibleVals(integer);
+                                        System.out
+                                                .println(
+                                                        "COLUMN, We are removing: " + integer + " from cell: " + o + "."
+                                                                + rowCol);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-
-                // Eliminate these if they exist elsewhare on these unique values row/cloumn
             }
         }
     }
@@ -118,10 +179,13 @@ public class SodukoSolver {
                 six = new LinkedHashSet<>();
 
                 for (int k = 0; k < 9; k++) {
-                    if (k < j * 3 + 3 && k >= j * 3)
-                        three.addAll(order.get(k));
-                    else
-                        six.addAll(order.get(k));
+                    if (order.get(k).size() != 1) {
+                        if (k < j * 3 + 3 && k >= j * 3) {
+                            three.addAll(order.get(k));
+                        } else {
+                            six.addAll(order.get(k));
+                        }
+                    }
                 }
                 uniqueElements = new HashSet<>(three);
                 uniqueElements.removeAll(six);
@@ -367,8 +431,9 @@ class Cell {
     }
 
     public void removePossibleVals(int i) {
-        if (possibleVals.contains(i))
+        if (possibleVals.contains(i)) {
             possibleVals.remove((Integer) i);
+        }
     }
 
     public void setPossibleVals(ArrayList<Integer> possible) {
