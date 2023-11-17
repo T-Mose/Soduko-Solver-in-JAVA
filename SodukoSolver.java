@@ -1,11 +1,15 @@
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class SodukoSolver {
     // https://www.sudoku-solutions.com/index.php?section=sudoku9by9 - To auto solve
-    public static String gameString = "010020300004005060070000008006900070000100002030048000500006040000800106008000000";
-    public static Matrix matrix;
+    public static String gameString = "010020300004001050060000007005400060000100002080092000300005090000700106007000000";
+    public static Matrix matrix; // To implement - pointing pairs from the perspective of the square, x-wing?
+                                 // brute force
 
     public static void main(String[] args) {
         matrix = new Matrix();
@@ -15,21 +19,106 @@ public class SodukoSolver {
 
     public static void Solve() {
         int i = 0;
+        int len = matrix.matrixToString().length();
         while (i++ < 20 && matrix.matrixToString().length() > 81) {
+            do {
+                len = matrix.matrixToString().length();
+                checkPossible(); // Run the easy calculations until the no longer improve
+                checkSingelValues(0); // Checks rows
+                checkPossible();
+                checkSingelValues(1); // Checks columns
+                checkPossible();
+                checkSingelValues(2); // Checks 3x3
+            } while (len != matrix.matrixToString().length());
             checkPossible();
-            checkSingelValues(0); // Checks rows
+            pointed(1); // Columns
             checkPossible();
-            checkSingelValues(1); // Checks columns
+            pointed(0); // Rows
             checkPossible();
-            checkSingelValues(2); // Checks 3x3
+            // pointed pairs from the perspective of the square
+            // Instead of checking the row/column then remove from square
+            // Do the reverse since there info can be gained
 
-            // Do pointing pair check
             // Bruteforce
         }
         if (i > 20)
             System.out.println("The string could not be solved, heres so far: ");
         else
             System.out.println("Solved, solution string: " + matrix.matrixToString() + " it took iterations: " + i);
+    }
+
+    public static void pointed(int row) {
+        // This removes pointed double/tripples from a column/rows - squares perspective
+        // Does not completly determin what the cell is going to be, but can remove what
+        // options it has
+        // Assume in a 3x3 7 can only be on two places on the same row
+        // Then other 7:s on the same row elsewhere can be eliminated
+        // Basically if one rule type influences anothers possibilities
+
+        // Check all rows and columns
+        // Find any number that exists only within a square
+        // Eliminate this number from any other cell within the same square
+        Map<Integer, ArrayList<Integer>> order;
+        Set<Integer> three;
+        Set<Integer> six;
+        for (int i = 0; i < 9; i++) {
+            order = new HashMap<>();
+            for (int j = 0; j < 9; j++) {
+                if (row == 0) { // Rows
+                    order.put(j, new ArrayList<>(matrix.getCell(i, j).getPossibleVals()));
+                } else if (row == 1) { // Columns
+                    order.put(j, new ArrayList<>(matrix.getCell(j, i).getPossibleVals()));
+                }
+            } // The ordered hashmaps are created
+              // Check if pointers occur
+
+            // iterate first 3 - check if any values here never show upp later in the
+            // hashmap
+            Set<Integer> uniqueElements;
+            for (int j = 0; j < 3; j++) { // Three different squares
+                three = new LinkedHashSet<>();
+                six = new LinkedHashSet<>();
+
+                for (int k = 0; k < 9; k++) {
+                    if (k < j * 3 + 3 && k >= j * 3)
+                        three.addAll(order.get(k));
+                    else
+                        six.addAll(order.get(k));
+                }
+                uniqueElements = new HashSet<>(three);
+                uniqueElements.removeAll(six);
+
+                if (!uniqueElements.isEmpty()) {
+                    // These elements should be removed from other cells within the 3x3 that also
+                    // i:th row, j:th 3x3
+                    // loop through the 3x3
+                    // halt for the specefied column
+                    // if any cell cointains values that also exists in the uniqueelements
+                    // remove them from the cell
+                    if (row == 0) {
+                        for (int c = (i / 3) * 3; c < (i / 3) * 3 + 3; c++) {
+                            for (int d = 3 * j; d < 3 + 3 * j; d++) {
+                                if (c != i % 3 + (i / 3) * 3) { // Rows
+                                    for (Integer integer : uniqueElements) {
+                                        matrix.getCell(c, d).removePossibleVals(integer);
+                                    }
+                                }
+                            }
+                        }
+                    } else if (row == 1) {
+                        for (int c = j * 3; c < j * 3 + 3; c++) {
+                            for (int d = (i / 3) * 3; d < (i / 3) * 3 + 3; d++) {
+                                if (d != i) { // Rows
+                                    for (Integer integer : uniqueElements) {
+                                        matrix.getCell(c, d).removePossibleVals(integer);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public static void checkSingelValues(int row) { // 0-row, 1-col, 2-3x3
@@ -240,6 +329,11 @@ class Cell {
         return "Cell" + String.valueOf(xCoordinate) + "_" + String.valueOf(yCoordinate);
     }
 
+    public void removePossibleVals(int i) {
+        if (possibleVals.contains(i))
+            possibleVals.remove((Integer) i);
+    }
+
     public void setPossibleVals(ArrayList<Integer> possible) {
         this.possibleVals = new ArrayList<>(possible);
     }
@@ -273,4 +367,3 @@ class Cell {
         return inLetters;
     }
 }
-// To implement - Checking 3x3, pointing pairs, brute force
