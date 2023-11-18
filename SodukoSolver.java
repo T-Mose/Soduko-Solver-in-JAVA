@@ -6,35 +6,50 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 /**
  * @author Theodor Malmgren
- * Solves upp to hard soduko puzzles. It does this thorugh logic, not bruteforce
- * though bruteforce will be implemented as a backup just so that every puzzle
- * has a solution (that can be solved). The basic premise is to solve the puzzle like
- * a human would. First palce all the possible values in each cell. This is in the form of an
- * arraylist on each cell object of the 2d matrix soduko grid. If this list just has one object
- * then said cell is solved. This is frequently redone, since everytime a cell gets solved
- * all the cells needs to be uppdated with their posssible values. 
- * The solving of the grid is done by checking for "hidden" singels where only one possible value
- * exists on one of the axis or 3x3. This can also be widened to hidden pairs and tripples. Here if two 
- * or three cells, more broadly if x cells have the same x possible values, all other possible values, of
- * said cell can be eliminated. Pointed pairs/tripples are also used to deduce if possible values can be
- * eliminated from other cells. For example if two only can exist on adjacent tiles in a row (9) and these 
- * adjacent cells are all in a 3x3, no other such values can exist in the 3x3. After each time a value has
- * been set, the game redoes the possible values for all other cells.
+ *         Solves upp to hard soduko puzzles. It does this thorugh logic, not
+ *         bruteforce
+ *         though bruteforce will be implemented as a backup just so that every
+ *         puzzle
+ *         has a solution (that can be solved). The basic premise is to solve
+ *         the puzzle like
+ *         a human would. First palce all the possible values in each cell. This
+ *         is in the form of an
+ *         arraylist on each cell object of the 2d matrix soduko grid. If this
+ *         list just has one object
+ *         then said cell is solved. This is frequently redone, since everytime
+ *         a cell gets solved
+ *         all the cells needs to be uppdated with their posssible values.
+ *         The solving of the grid is done by checking for "hidden" singels
+ *         where only one possible value
+ *         exists on one of the axis or 3x3. This can also be widened to hidden
+ *         pairs and tripples. Here if two
+ *         or three cells, more broadly if x cells have the same x possible
+ *         values, all other possible values, of
+ *         said cell can be eliminated. Pointed pairs/tripples are also used to
+ *         deduce if possible values can be
+ *         eliminated from other cells. For example if two only can exist on
+ *         adjacent tiles in a row (9) and these
+ *         adjacent cells are all in a 3x3, no other such values can exist in
+ *         the 3x3. After each time a value has
+ *         been set, the game redoes the possible values for all other cells.
  */
 public class SodukoSolver {
     // https://www.sudoku-solutions.com/index.php?section=sudoku9by9 - To auto solve
     public static String gameString = "010020300002003040080000006004700030000600008070098000300004090000800104006000000";
-    public static Matrix matrix; 
+    public static Matrix matrix;
     // Things to add
-    // Hidden pairs and tripples for rows and columns
+    // Naked pairs and tripples for rows, columns
     // X, Y and XY wings, whatever those are
     // Swordfirsh, whatever that is
     // Brute force
-    // Try to put the checkPossible, to only occur when somthing of importance has changed
+    // Try to put the checkPossible, to only occur when somthing of importance has
+    // changed
     public static final boolean DEBUG = false;
-
+    // What i actually will implement:
+    // Naked pairs, maybe tripples
     public static void main(String[] args) {
         if (args.length == 1) {
             gameString = args[0];
@@ -43,11 +58,12 @@ public class SodukoSolver {
         Solve();
         matrix.displayMatrix();
     }
-        /**
+
+    /**
      * Where all the different methods that solves the puzzle is called from
      */
     public static void Solve() {
-        int len; 
+        int len;
         int maxIterations = 20; // In case something goes wrong
         int currentIteration = 0;
         int previousLen;
@@ -71,8 +87,11 @@ public class SodukoSolver {
             pointedSquare(true); // rows
             pointedSquare(false); // Columns
             hiddenPairSquare(); // Hidden pairs in 3x3
-            hiddenTripplesSquare(); 
-            // Should work, but have only tested on two games, does not appear to be super common
+            hiddenTripplesSquare();
+            hiddenPairsColumn();
+            hiddenPairsRow();
+            // Should work, but have only tested on two games, does not appear to be super
+            // common
 
             // Add check for hidden pairs in rows/columns
             if (len == matrix.matrixToString().length()) {
@@ -97,6 +116,170 @@ public class SodukoSolver {
         }
     }
 
+    public static void hiddenPairsRow() {
+        // My prevoius combinationn of both axis at the same time will no longer
+        // continue
+        List<String> locationsNum1;
+        List<String> locationsNum2;
+        for (int row = 0; row < 9; row++) {
+            Map<Integer, List<String>> numberLocations = new HashMap<>();
+
+            // Populate numberLocations for this row
+            for (int col = 0; col < 9; col++) {
+                List<Integer> possibleVals = matrix.getCell(row, col).getPossibleVals();
+                for (Integer val : possibleVals) {
+                    numberLocations.computeIfAbsent(val, x -> new ArrayList<>()).add(row + "-" + col);
+                }
+            } // This should populate the map based on location and value
+
+            for (int num1 = 1; num1 <= 9; num1++) { // The same broad öpgoc as the 3x3
+                for (int num2 = num1 + 1; num2 <= 9; num2++) {
+                    locationsNum1 = numberLocations.get(num1);
+                    locationsNum2 = numberLocations.get(num2);
+
+                    if (locationsNum1 != null && locationsNum2 != null &&
+                            locationsNum1.equals(locationsNum2) && locationsNum1.size() == 2) {
+                        // Found a hidden pair (num1, num2) in this row
+                        for (String location : locationsNum1) {
+                            String[] parts = location.split("-");
+                            int row1 = Integer.parseInt(parts[0]);
+                            int col1 = Integer.parseInt(parts[1]);
+                            matrix.getCell(row1, col1).setPossibleVals(new ArrayList<>(Arrays.asList(num1, num2)));
+                        }
+                    }
+                }
+            }
+            // Check for hidden pairs/triples in numberLocations
+            // Similar logic to your 3x3 squares method but applied to this row
+        }
+        checkPossible();
+    }
+
+    public static void hiddenTripplesColumn() {
+        for (int col = 0; col < 9; col++) {
+            Map<Integer, List<String>> numberLocations = new HashMap<>();
+
+            // Populate numberLocations for this column
+            for (int row = 0; row < 9; row++) {
+                List<Integer> possibleVals = matrix.getCell(row, col).getPossibleVals();
+                for (Integer val : possibleVals) {
+                    numberLocations.computeIfAbsent(val, x -> new ArrayList<>()).add(row + "-" + col);
+                }
+            }
+
+            // Check for hidden pairs
+            for (int num1 = 1; num1 <= 9; num1++) {
+                for (int num2 = num1 + 1; num2 <= 9; num2++) {
+                    for (int num3 = num2 + 1; num3 <= 9; num3++) {
+                        List<String> locationsNum1 = numberLocations.get(num1);
+                        List<String> locationsNum2 = numberLocations.get(num2);
+                        List<String> locationsNum3 = numberLocations.get(num3);
+                        if (locationsNum1 != null && locationsNum2 != null && locationsNum3 != null) {
+                            Set<String> combinedLocations = new HashSet<String>();
+                            combinedLocations.addAll(locationsNum1);
+                            combinedLocations.addAll(locationsNum2);
+                            combinedLocations.addAll(locationsNum3);
+
+                            if (combinedLocations.size() == 3) {
+                                // That means they are all the same
+                                for (String location : locationsNum1) {
+                                    String[] parts = location.split("-");
+                                    int row1 = Integer.parseInt(parts[0]);
+                                    int col1 = Integer.parseInt(parts[1]);
+                                    matrix.getCell(row1, col1)
+                                            .setPossibleVals(new ArrayList<>(Arrays.asList(num1, num2, num3)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        checkPossible();
+    }
+
+    public static void hiddenTripplesRow() {
+        List<String> locationsNum1;
+        List<String> locationsNum2;
+        List<String> locationsNum3;
+        Set<String> combinedLocations;
+        for (int row = 0; row < 9; row++) {
+            Map<Integer, List<String>> numberLocations = new HashMap<>();
+
+            // Populate numberLocations for this row
+            for (int col = 0; col < 9; col++) {
+                List<Integer> possibleVals = matrix.getCell(row, col).getPossibleVals();
+                for (Integer val : possibleVals) {
+                    numberLocations.computeIfAbsent(val, x -> new ArrayList<>()).add(row + "-" + col);
+                }
+            } // This should populate the map based on location and value
+
+            for (int num1 = 1; num1 <= 9; num1++) { // The same broad öpgoc as the 3x3
+                for (int num2 = num1 + 1; num2 <= 9; num2++) {
+                    for (int num3 = num2 + 1; num3 <= 9; num3++) {
+                        locationsNum1 = numberLocations.get(num1);
+                        locationsNum2 = numberLocations.get(num2);
+                        locationsNum3 = numberLocations.get(num3);
+
+                        if (locationsNum1 != null && locationsNum2 != null && locationsNum3 != null) {
+                            combinedLocations = new HashSet<String>();
+                            combinedLocations.addAll(locationsNum1);
+                            combinedLocations.addAll(locationsNum2);
+                            combinedLocations.addAll(locationsNum3);
+                            if (combinedLocations.size() == 3) {
+                                // Then they were the same
+                                                                for (String location : locationsNum1) {
+                                    String[] parts = location.split("-");
+                                    int row1 = Integer.parseInt(parts[0]);
+                                    int col1 = Integer.parseInt(parts[1]);
+                                    matrix.getCell(row1, col1)
+                                            .setPossibleVals(new ArrayList<>(Arrays.asList(num1, num2, num3)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Check for hidden pairs/triples in numberLocations
+            // Similar logic to your 3x3 squares method but applied to this row
+        }
+        checkPossible();
+    }
+
+    public static void hiddenPairsColumn() {
+        for (int col = 0; col < 9; col++) {
+            Map<Integer, List<String>> numberLocations = new HashMap<>();
+
+            // Populate numberLocations for this column
+            for (int row = 0; row < 9; row++) {
+                List<Integer> possibleVals = matrix.getCell(row, col).getPossibleVals();
+                for (Integer val : possibleVals) {
+                    numberLocations.computeIfAbsent(val, x -> new ArrayList<>()).add(row + "-" + col);
+                }
+            }
+
+            // Check for hidden pairs
+            for (int num1 = 1; num1 <= 9; num1++) {
+                for (int num2 = num1 + 1; num2 <= 9; num2++) {
+                    List<String> locationsNum1 = numberLocations.get(num1);
+                    List<String> locationsNum2 = numberLocations.get(num2);
+
+                    if (locationsNum1 != null && locationsNum2 != null &&
+                            locationsNum1.equals(locationsNum2) && locationsNum1.size() == 2) {
+                        // Found a hidden pair (num1, num2) in this column
+                        for (String location : locationsNum1) {
+                            String[] parts = location.split("-");
+                            int row1 = Integer.parseInt(parts[0]);
+                            int col1 = Integer.parseInt(parts[1]);
+                            matrix.getCell(row1, col1).setPossibleVals(new ArrayList<>(Arrays.asList(num1, num2)));
+                        }
+                    }
+                }
+            }
+        }
+        checkPossible();
+    }
+
     public static void hiddenTripplesSquare() {
         // Based on the same logic of the hiddenPairSquare, but
         // Still different enough to warrent a different method
@@ -113,8 +296,10 @@ public class SodukoSolver {
                 for (int num1 = 1; num1 <= 9; num1++) {
                     for (int num2 = num1 + 1; num2 <= 9; num2++) {
                         for (int num3 = num2 + 1; num3 <= 9; num3++) {
-                            // Combine the locations of num1, num2, and num3
+                            // Since three values has to be the same a tripple nested loop is required
                             if (num1 != num2 && num1 != num2 && num2 != num3) {
+                                // This check is also not needed since the for loops are now based on the
+                                // prevoius one
                                 // Could be simplified, these 3 Lists are redundant
                                 locationsNum1 = numberLocations.get(num1);
                                 locationsNum2 = numberLocations.get(num2);
@@ -151,7 +336,8 @@ public class SodukoSolver {
         }
         checkPossible(); // Redo the possible values
     }
-     /**
+
+    /**
      * @return a populated hashmap of the 3x3 with each value and their location
      */
     public static Map<Integer, List<String>> populateSquare(int i, int j) {
@@ -191,7 +377,9 @@ public class SodukoSolver {
                 // Iterate over all of these elements and check if there are any two values that
                 // only show up in two cells
                 for (int num1 = 1; num1 <= 9; num1++) {
-                    for (int num2 = 1; num2 <= 9; num2++) {
+                    for (int num2 = num1 + 1; num2 <= 9; num2++) {
+                        // Should half iterations num1 + 1, and make sure duplicates are no more,
+                        // Additionally the if comparison is redundant, but does not break anything
                         // There is a possibility that this updates the two cells twice, since the map
                         // is made
                         // With the values and not updated if the first iteration of this loop changes
@@ -225,7 +413,7 @@ public class SodukoSolver {
         }
         checkPossible();
     }
-    
+
     public static void pointedSquare(boolean row) {
         // Will try to merge this method with pointed, wont happen
         Map<String, ArrayList<Integer>> order;
@@ -249,7 +437,7 @@ public class SodukoSolver {
                     three = new LinkedHashSet<>();
                     six = new LinkedHashSet<>();
                     for (int k = i; k < i + 3; k++) {
-                        for (int l = j; l < j + 3; l++) { 
+                        for (int l = j; l < j + 3; l++) {
                             // Iterate through all the cells inside the 3x3
                             location = l + "-" + k; // Info about the cells location
                             if (order.get(location).size() != 1) {
@@ -258,8 +446,9 @@ public class SodukoSolver {
                                         three.addAll(order.get(location));
                                     } else {
                                         six.addAll(order.get(location));
-                                    } 
-                                    // The modulous checks are since we want to distinguish the sub-row/column we are comparing
+                                    }
+                                    // The modulous checks are since we want to distinguish the sub-row/column we
+                                    // are comparing
                                     // With the rest of the entire axis
                                 } else if (!row) {
                                     if (l % 3 == a) { // The sought after column
@@ -274,24 +463,24 @@ public class SodukoSolver {
                     uniqueElements = new HashSet<>(three);
                     uniqueElements.removeAll(six); // The ones left should be the unique elements
                     rowCol = row ? i + a : j + a; // Since rows and columns are different
-                    for (int o = 0; o < 9; o++) { 
+                    for (int o = 0; o < 9; o++) {
                         if (row && !(j <= o && o < j + 3)) {
-                                for (Integer integer : uniqueElements) {
-                                    // Iterate and remove the values from other cells in the column
-                                    if (matrix.getCell(rowCol, o).getPossibleVals().contains(integer)) {
-                                        matrix.getCell(rowCol, o).removePossibleVals(integer);
-                                        moreInfor("PointedSquare", "Row", String.valueOf(integer),
-                                                matrix.getCell(rowCol, o).getName());
-                                    }
+                            for (Integer integer : uniqueElements) {
+                                // Iterate and remove the values from other cells in the column
+                                if (matrix.getCell(rowCol, o).getPossibleVals().contains(integer)) {
+                                    matrix.getCell(rowCol, o).removePossibleVals(integer);
+                                    moreInfor("PointedSquare", "Row", String.valueOf(integer),
+                                            matrix.getCell(rowCol, o).getName());
                                 }
+                            }
                         } else if (!row && !(i <= o && o < i + 3)) {
-                                for (Integer integer : uniqueElements) {
-                                    if (matrix.getCell(o, rowCol).getPossibleVals().contains(integer)) {
-                                        matrix.getCell(o, rowCol).removePossibleVals(integer);
-                                        moreInfor("PointedSquare", "Column", String.valueOf(integer),
-                                                matrix.getCell(o, rowCol).getName());
-                                    }
+                            for (Integer integer : uniqueElements) {
+                                if (matrix.getCell(o, rowCol).getPossibleVals().contains(integer)) {
+                                    matrix.getCell(o, rowCol).removePossibleVals(integer);
+                                    moreInfor("PointedSquare", "Column", String.valueOf(integer),
+                                            matrix.getCell(o, rowCol).getName());
                                 }
+                            }
                         }
                     }
                 }
@@ -383,8 +572,10 @@ public class SodukoSolver {
     }
 
     public static void checkSingelValues(int row) { // 0-row, 1-col, 2-3x3
-        // If a naked single exists on the row, column or 3x3, set that location to that value
-        // For example checks the row for any unique value, that cell has to be said value
+        // If a naked single exists on the row, column or 3x3, set that location to that
+        // value
+        // For example checks the row for any unique value, that cell has to be said
+        // value
         Map<Integer, Integer> frequency;
         ArrayList<Integer> nums;
         for (int i = 0; i < 9; i++) {
@@ -451,6 +642,7 @@ public class SodukoSolver {
         }
         checkPossible();
     }
+
     /**
      * Iterates thorugh all cells and each cells adjacent list
      * This list keeps track of every cell in the same row, column and 3x3
@@ -477,9 +669,11 @@ public class SodukoSolver {
                 }
             }
             if (matrix.matrixToString().length() == len) {
-                break; 
-                // This update is repeated, since there is a possibility that the update created a new solved cell
-                // Ie if the cell 1.1 has the possible values: 1, 7. And from the row 7 is removed, this cell is now solved
+                break;
+                // This update is repeated, since there is a possibility that the update created
+                // a new solved cell
+                // Ie if the cell 1.1 has the possible values: 1, 7. And from the row 7 is
+                // removed, this cell is now solved
                 // But the adjacent cells need to be updated that this cell is not set at 1.
             } else {
                 len = matrix.matrixToString().length();
@@ -487,8 +681,10 @@ public class SodukoSolver {
         }
     }
 }
+
 /**
- * For initiating the puzzle matrix, to displayand some getters and setters for the matrix object
+ * For initiating the puzzle matrix, to displayand some getters and setters for
+ * the matrix object
  */
 class Matrix {
     public Cell[][] matrix;
@@ -527,9 +723,10 @@ class Matrix {
             }
         }
     }
+
     /**
      * Displays the entire soduko matrix with formating
-     * If a cell i solved it is displayed in green. 
+     * If a cell i solved it is displayed in green.
      * Can be full or simplified all one char or all possible values for each cell
      */
     public void displayMatrix() {
@@ -586,11 +783,13 @@ class Matrix {
         }
     }
 }
-/** An object of each cell in the soduko matrix
+
+/**
+ * An object of each cell in the soduko matrix
  * Keeps track of possible values, adjacent values
- * Has some setters and getters for this, primarly the 
+ * Has some setters and getters for this, primarly the
  * set possible vals, and remove possible val
- */ 
+ */
 
 class Cell {
     public ArrayList<Integer> possibleVals = new ArrayList<>(); // Every number this cell can be
@@ -667,4 +866,3 @@ class Cell {
 // other matrix, and
 // Guess the other value/s. Will be difficult if multiple values needs to be
 // guessed in a row.
-
