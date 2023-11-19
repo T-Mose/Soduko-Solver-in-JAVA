@@ -6,6 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+// Naked pairs for rows and columns are almoste done, just needs some debugging
 
 /**
  * @author Theodor Malmgren
@@ -38,9 +39,10 @@ import java.util.Set;
  */
 public class SodukoSolver {
     // https://www.sudoku-solutions.com/index.php?section=sudoku9by9 - To auto solve
-    public static String gameString = "010020300002003040080000006004700030000600008070098000300004090000800104006000000";
+    public static String gameString = "010020300002003040050000006004700050000100008070068000300004060000500104009000000";
     public static Matrix matrix;
     // Things to add
+    // Unsure if naked pairs for 3x3, are solved
     // Naked pairs and tripples for rows, columns
     // X, Y and XY wings, whatever those are
     // Swordfirsh, whatever that is
@@ -48,13 +50,13 @@ public class SodukoSolver {
     // Try to put the checkPossible, to only occur when somthing of importance has
     // changed
     public static final boolean DEBUG = false;
-    // What i actually will implement:
-    // Naked pairs, maybe tripples
+
     public static void main(String[] args) {
         if (args.length == 1) {
             gameString = args[0];
         } // Instead of having to change the hard coded gameString, take input
         matrix = new Matrix();
+        matrix.displayMatrix();
         Solve();
         matrix.displayMatrix();
     }
@@ -87,10 +89,11 @@ public class SodukoSolver {
             pointedSquare(true); // rows
             pointedSquare(false); // Columns
             hiddenPairSquare(); // Hidden pairs in 3x3
-            hiddenTripplesSquare();
+            hiddenTripplesSquare(); // Should work, but have only tested on two games, does not appear to be super
             hiddenPairsColumn();
             hiddenPairsRow();
-            // Should work, but have only tested on two games, does not appear to be super
+            nakedPairsColumns(); // Should work now
+            nakedPairsRow(); // Should work but not tested
             // common
 
             // Add check for hidden pairs in rows/columns
@@ -107,6 +110,97 @@ public class SodukoSolver {
         } else {
             System.out.println("Sudoku not solved in " + currentIteration + " iterations.");
         }
+    }
+
+    public static void Sleep(int time) {
+        try {
+            Thread.sleep(time);
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+    public static void nakedPairsRow() {
+        String location;
+        for (int row = 0; row < 9; row++) {
+            // Find cells in this row with only two possible values
+            Map<List<Integer>, List<String>> pairsMap = new HashMap<>();
+            for (int col = 0; col < 9; col++) {
+                Cell cell = matrix.getCell(row, col);
+                if (cell.getPossibleVals().size() == 2) {
+                    List<Integer> possibleVals = cell.getPossibleVals();
+                    location = String.valueOf(row) + "-" + String.valueOf(col);
+                    pairsMap.computeIfAbsent(possibleVals, x -> new ArrayList<>()).add(location);
+                }
+            }
+            // matrix.displayMatrix();
+            for (Map.Entry<List<Integer>, List<String>> entry : pairsMap.entrySet()) {
+                if (entry.getValue().size() == 2) {
+                    // A naked double is found
+                    String[] first = entry.getValue().get(0).split("-");
+                    String[] second = entry.getValue().get(1).split("-");
+                    int num1 = entry.getKey().get(0);
+                    int num2 = entry.getKey().get(1);
+
+                    for (int i = 0; i < 9; i++) {
+                        if (i != Integer.parseInt(first[1]) && i != Integer.parseInt(second[1])) {
+                            // These two are the original naked pair
+                            Cell cell = matrix.getCell(row, i);
+                            if (cell.getPossibleVals().contains(num1)) {
+                                // Remove it num1 from this cell
+                                cell.removePossibleVals(num1);
+                            }
+                            if (cell.getPossibleVals().contains(num2)) {
+                                // Remove num2 from this cell
+                                cell.removePossibleVals(num2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        checkPossible();
+    }
+
+    public static void nakedPairsColumns() {
+        String location;
+        for (int col = 0; col < 9; col++) {
+            // Find cells in this row with only two possible values
+            Map<List<Integer>, List<String>> pairsMap = new HashMap<>();
+            for (int row = 0; row < 9; row++) {
+                Cell cell = matrix.getCell(row, col);
+                if (cell.getPossibleVals().size() == 2) {
+                    List<Integer> possibleVals = cell.getPossibleVals();
+                    location = String.valueOf(col) + "-" + String.valueOf(row);
+                    pairsMap.computeIfAbsent(possibleVals, x -> new ArrayList<>()).add(location);
+                }
+            } // This creates and populates a map of all cells and their location whoose cells has two values
+            // matrix.displayMatrix();
+            for (Map.Entry<List<Integer>, List<String>> entry : pairsMap.entrySet()) {
+                if (entry.getValue().size() == 2) {
+                    // A naked double is found
+                    String[] first = entry.getValue().get(0).split("-");
+                    String[] second = entry.getValue().get(1).split("-");
+                    int num1 = entry.getKey().get(0);
+                    int num2 = entry.getKey().get(1);
+
+                    for (int i = 0; i < 9; i++) {
+                        if (i != Integer.parseInt(first[1]) && i != Integer.parseInt(second[1])) {
+                            // These two are the original naked pair
+                            Cell cell = matrix.getCell(i, col);
+                            if (cell.getPossibleVals().contains(num1)) {
+                                // Remove it num1 from this cell
+                                cell.removePossibleVals(num1);
+                            }
+                            if (cell.getPossibleVals().contains(num2)) {
+                                // Remove num2 from this cell
+                                cell.removePossibleVals(num2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        checkPossible();
     }
 
     public static void moreInfor(String method, String type, String change, String where) {
@@ -228,7 +322,7 @@ public class SodukoSolver {
                             combinedLocations.addAll(locationsNum3);
                             if (combinedLocations.size() == 3) {
                                 // Then they were the same
-                                                                for (String location : locationsNum1) {
+                                for (String location : locationsNum1) {
                                     String[] parts = location.split("-");
                                     int row1 = Integer.parseInt(parts[0]);
                                     int col1 = Integer.parseInt(parts[1]);
@@ -819,6 +913,7 @@ class Cell {
             possibleVals.remove((Integer) i);
         }
         if (possibleVals.size() == 1) {
+            System.out.println("WE her");
             SodukoSolver.checkPossible();
         }
     }
