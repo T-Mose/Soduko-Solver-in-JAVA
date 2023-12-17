@@ -6,49 +6,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-// Naked pairs for rows and columns are almoste done, just needs some debugging
 
-/**
- * @author Theodor Malmgren
- *         Solves upp to hard soduko puzzles. It does this thorugh logic, not
- *         bruteforce
- *         though bruteforce will be implemented as a backup just so that every
- *         puzzle
- *         has a solution (that can be solved). The basic premise is to solve
- *         the puzzle like
- *         a human would. First palce all the possible values in each cell. This
- *         is in the form of an
- *         arraylist on each cell object of the 2d matrix soduko grid. If this
- *         list just has one object
- *         then said cell is solved. This is frequently redone, since everytime
- *         a cell gets solved
- *         all the cells needs to be uppdated with their posssible values.
- *         The solving of the grid is done by checking for "hidden" singels
- *         where only one possible value
- *         exists on one of the axis or 3x3. This can also be widened to hidden
- *         pairs and tripples. Here if two
- *         or three cells, more broadly if x cells have the same x possible
- *         values, all other possible values, of
- *         said cell can be eliminated. Pointed pairs/tripples are also used to
- *         deduce if possible values can be
- *         eliminated from other cells. For example if two only can exist on
- *         adjacent tiles in a row (9) and these
- *         adjacent cells are all in a 3x3, no other such values can exist in
- *         the 3x3. After each time a value has
- *         been set, the game redoes the possible values for all other cells.
- */
 public class SodukoSolver {
     // https://www.sudoku-solutions.com/index.php?section=sudoku9by9 - To auto solve
-    public static String gameString = "010020300002003040050000006004700050000100008070068000300004060000500104009000000";
+    public static String gameString = "010020300004003050050000006005700040000100002070082000300005090000600105006000000";
     public static Matrix matrix;
-    // Things to add
-    // Unsure if naked pairs for 3x3, are solved
-    // Naked pairs and tripples for rows, columns
-    // X, Y and XY wings, whatever those are
-    // Swordfirsh, whatever that is
-    // Brute force
-    // Try to put the checkPossible, to only occur when somthing of importance has
-    // changed
     public static final boolean DEBUG = false;
 
     public static void main(String[] args) {
@@ -56,8 +18,10 @@ public class SodukoSolver {
             gameString = args[0];
         } // Instead of having to change the hard coded gameString, take input
         matrix = new Matrix();
-        matrix.displayMatrix();
-        Solve();
+        if (matrix.hasContradiction())
+            System.out.println("Incorrect input");
+        else
+            Solve();
         matrix.displayMatrix();
     }
 
@@ -66,45 +30,25 @@ public class SodukoSolver {
      */
     public static void Solve() {
         int len;
-        int maxIterations = 20; // In case something goes wrong
+        int maxIterations = 50; // In case something goes wrong
         int currentIteration = 0;
         int previousLen;
-
         while (currentIteration++ < maxIterations) {
             len = matrix.matrixToString().length();
-            checkPossible();
+            applySolving();
 
-            do { // Start with simple solving methods
-                previousLen = len;
-                checkSingelValues(0); // Rows
-                checkSingelValues(1); // Columns
-                checkSingelValues(2); // 3x3 Squares
-                len = matrix.matrixToString().length();
-            } while (len != previousLen);
             if (len == 81) {
                 break; // Puzzle solved
             }
-            pointed(1); // Columns
-            pointed(0); // Rows
-            pointedSquare(true); // rows
-            pointedSquare(false); // Columns
-            hiddenPairSquare(); // Hidden pairs in 3x3
-            hiddenTripplesSquare(); // Should work, but have only tested on two games, does not appear to be super
-            hiddenPairsColumn();
-            hiddenPairsRow();
-            nakedPairsColumns(); // Should work now
-            nakedPairsRow(); // Should work but not tested
-            // common
-
-            // Add check for hidden pairs in rows/columns
             if (len == matrix.matrixToString().length()) {
-                System.out.println("Could not be solved");
+                System.out.println("Conventional methods stalled. Here's the matrix before. Trying brute force...");
+                matrix.displayMatrix();
+                bruteForce(0);
                 break;
             }
-            // brute force requred if it could not be doen
         }
 
-        if (matrix.matrixToString().length() == 81) {
+        if (matrix.isSolved()) {
             System.out.println("Sudoku solved! it took this many iterations: " + currentIteration);
             System.out.println("The complete string is: " + matrix.matrixToString());
         } else {
@@ -112,13 +56,47 @@ public class SodukoSolver {
         }
     }
 
-    public static void Sleep(int time) {
-        try {
-            Thread.sleep(time);
-        } catch (Exception e) {
-            System.out.println(e);
-        }
+    public static void applySolving() {
+        // Where the logic for solving exists
+        int previousLen, currentLen;
+        boolean progressMade = false;
+
+        do {
+            do {
+                previousLen = matrix.matrixToString().length();
+                // Apply simple and efficient solving methods first
+                checkPossible(); // Updates possible values for each cell
+                checkSingelValues(0); // Rows
+                checkSingelValues(1); // Columns
+                checkSingelValues(2); // 3x3 Squares
+                currentLen = matrix.matrixToString().length();
+                progressMade = (currentLen != previousLen); // Check if progress was made
+            } while (progressMade);
+            if (!matrix.isSolved() && !matrix.hasContradiction()) {
+                // Was not solved by easy means
+                checkPossible(); // Updates possible values for each cell
+                previousLen = matrix.matrixToString().length();
+                nakedPairsColumns(); // Should work now
+                nakedPairsRow(); // Should work but not tested
+
+                hiddenPairsColumn();
+                hiddenPairsRow();
+                hiddenPairSquare(); // Hidden pairs in 3x3
+
+                pointed(1); // Columns
+                pointed(0); // Rows
+                pointedSquare(true); // rows
+                pointedSquare(false); // Columns
+
+                hiddenTripplesSquare(); // Should work, but have only tested on two games, does not appear to be super
+                currentLen = matrix.matrixToString().length();
+                progressMade = (currentLen != previousLen); // Check if progress was made
+            }
+            if (matrix.hasContradiction())
+                break;
+        } while (progressMade);
     }
+
     public static void nakedPairsRow() {
         String location;
         for (int row = 0; row < 9; row++) {
@@ -173,8 +151,9 @@ public class SodukoSolver {
                     location = String.valueOf(col) + "-" + String.valueOf(row);
                     pairsMap.computeIfAbsent(possibleVals, x -> new ArrayList<>()).add(location);
                 }
-            } // This creates and populates a map of all cells and their location whoose cells has two values
-            // matrix.displayMatrix();
+            } // This creates and populates a map of all cells and their location whoose cells
+              // has two values
+              // matrix.displayMatrix();
             for (Map.Entry<List<Integer>, List<String>> entry : pairsMap.entrySet()) {
                 if (entry.getValue().size() == 2) {
                     // A naked double is found
@@ -204,7 +183,7 @@ public class SodukoSolver {
     }
 
     public static void moreInfor(String method, String type, String change, String where) {
-        if (DEBUG) {
+        if (DEBUG) { // General debug method
             System.out.println("In the: " + method + " of this type: " + type + " we made this change: " + change
                     + " at this location: " + where);
         }
@@ -774,6 +753,34 @@ public class SodukoSolver {
             }
         }
     }
+
+    public static void bruteForce(int depth) {
+        // Backtracking algoritm, where we guess one cells value, work from there,
+        // if it does not work, go back to the last guess and guess again
+        if (matrix.isSolved()) {
+            return; // Base case: puzzle is solved
+        }
+        Cell cellToGuess = matrix.lowest(); // Cell with the fewest possibilities
+        if (cellToGuess == null) {
+            System.out.println("There is no solution, through bruteforcing");
+            return; // No valid cell to guess, or puzzle is unsolvable
+        }
+        List<Integer> possibleValues = new ArrayList<>(cellToGuess.getPossibleVals());
+        for (int value : possibleValues) {
+            Matrix savedState = new Matrix(matrix); // Save the current state
+            matrix.getCell(cellToGuess.getX(), cellToGuess.getY())
+                    .setPossibleVals(new ArrayList<>(Arrays.asList(value)));
+            applySolving(); // Apply solving techniques
+
+            if (!matrix.hasContradiction()) {
+                bruteForce(depth + 1); // Recursive call
+            }
+            if (matrix.isSolved()) {
+                return; // The matrix is now solved
+            }
+            matrix = savedState; // Revert to saved state if guess didn't work
+        }
+    }
 }
 
 /**
@@ -790,6 +797,98 @@ class Matrix {
         matrix = new Cell[9][9];
         setCells();
         setAdjacent();
+    }
+
+    public Matrix(Matrix original) { // Calls cells copy constructor
+        this.matrix = new Cell[9][9];
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                this.matrix[i][j] = new Cell(original.matrix[i][j]);
+            }
+        }
+        setAdjacent();
+    }
+
+    public boolean isSolved() {
+        return (81 == this.matrixToString().length()) && !hasContradiction();
+    }
+
+    public Cell lowest() {
+        int lowestCount = Integer.MAX_VALUE;
+        Cell lowestCell = null;
+
+        for (int i = 0; i < 9; i++) {
+            for (int j = 0; j < 9; j++) {
+                int possibleValsSize = matrix[i][j].getPossibleVals().size();
+                if (possibleValsSize < lowestCount && possibleValsSize > 1) {
+                    lowestCount = possibleValsSize;
+                    lowestCell = matrix[i][j];
+                }
+            }
+        }
+        return lowestCell;
+    }
+
+    public boolean hasContradiction() {
+        for (int i = 0; i < 9; i++) {
+            if (hasDuplicateInRow(i) || hasDuplicateInColumn(i) || hasDuplicateInSubgrid(i)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDuplicateInRow(int row) {
+        Set<Integer> seen = new HashSet<>();
+        for (int col = 0; col < 9; col++) {
+            Cell cell = this.getCell(row, col);
+            if (cell.getPossibleVals().size() == 1) {
+                int val = cell.getPossibleVals().get(0);
+                if (seen.contains(val)) {
+                    return true; // Duplicate found
+                }
+                seen.add(val);
+            }
+            if (cell.getPossibleVals().size() == 0)
+                return true;
+        }
+        return false;
+    }
+
+    private boolean hasDuplicateInColumn(int col) {
+        Set<Integer> seen = new HashSet<>();
+        for (int row = 0; row < 9; row++) {
+            Cell cell = this.getCell(row, col);
+            if (cell.getPossibleVals().size() == 1) {
+                int val = cell.getPossibleVals().get(0);
+                if (seen.contains(val)) {
+                    return true; // Duplicate found
+                }
+                seen.add(val);
+            }
+            if (cell.getPossibleVals().size() == 0)
+                return true;
+        }
+        return false;
+    }
+
+    private boolean hasDuplicateInSubgrid(int index) {
+        Set<Integer> seen = new HashSet<>();
+        int startRow = (index / 3) * 3;
+        int startCol = (index % 3) * 3;
+        for (int row = startRow; row < startRow + 3; row++) {
+            for (int col = startCol; col < startCol + 3; col++) {
+                Cell cell = this.getCell(row, col);
+                if (cell.getPossibleVals().size() == 1) {
+                    int val = cell.getPossibleVals().get(0);
+                    if (seen.contains(val)) {
+                        return true; // Duplicate found
+                    }
+                    seen.add(val);
+                }
+            }
+        }
+        return false;
     }
 
     public String matrixToString() {
@@ -892,6 +991,7 @@ class Cell {
     public int yCoordinate;
 
     public Cell(int x, int y, int valPosition) {
+        // Default constructor
         this.xCoordinate = x;
         this.yCoordinate = y;
 
@@ -904,6 +1004,15 @@ class Cell {
         }
     }
 
+    public Cell(Cell original) {
+        // Deep copy cell constructor
+        this.xCoordinate = original.xCoordinate;
+        this.yCoordinate = original.yCoordinate;
+
+        // Deep copy of possible values (assuming possibleVals is a List<Integer>)
+        this.possibleVals = new ArrayList<>(original.possibleVals);
+    }
+
     public String getName() {
         return "Cell" + String.valueOf(xCoordinate) + "_" + String.valueOf(yCoordinate);
     }
@@ -913,7 +1022,6 @@ class Cell {
             possibleVals.remove((Integer) i);
         }
         if (possibleVals.size() == 1) {
-            System.out.println("WE her");
             SodukoSolver.checkPossible();
         }
     }
@@ -928,11 +1036,11 @@ class Cell {
         return this.possibleVals;
     }
 
-    public int getX() { // Redundant
+    public int getX() {
         return xCoordinate;
     }
 
-    public int getY() { // Redundant
+    public int getY() {
         return yCoordinate;
     }
 
@@ -953,11 +1061,3 @@ class Cell {
         return inLetters;
     }
 }
-// Brute forcing - take the incomplete map, guess one of the cells, preferebly
-// one with few possible
-// Set said value, keep track of the others. Return the new map and try to solve
-// it
-// Implement a check to se if somthings gone wrong, in that case return to the
-// other matrix, and
-// Guess the other value/s. Will be difficult if multiple values needs to be
-// guessed in a row.
